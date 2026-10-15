@@ -1,0 +1,98 @@
+{
+  "expectedTarballFiles": [
+    "package/LICENSE",
+    "package/README.md",
+    "package/dist/assets.d.ts",
+    "package/dist/avatar.d.ts",
+    "package/dist/avatar.js",
+    "package/dist/assets.js",
+    "package/dist/controls.d.ts",
+    "package/dist/controls.js",
+    "package/dist/customization.d.ts",
+    "package/dist/customization.js",
+    "package/dist/document.d.ts",
+    "package/dist/document.js",
+    "package/dist/index.d.ts",
+    "package/dist/index.js",
+    "package/dist/ink.d.ts",
+    "package/dist/ink.js",
+    "package/dist/mycelium.d.ts",
+    "package/dist/mycelium.js",
+    "package/dist/player.d.ts",
+    "package/dist/player.js",
+    "package/dist/react.d.ts",
+    "package/dist/react.js",
+    "package/dist/render-style.d.ts",
+    "package/dist/render-style.js",
+    "package/dist/video.d.ts",
+    "package/dist/video.js",
+    "package/package.json"
+  ],
+  "localDependencies": ["../cairn"],
+  "runtimeFixture": "test/stranger/runtime.mjs",
+  "typecheckFixture": "test/stranger/consumer.mts",
+  "docs": {
+    "sigil": "generateMedia",
+    "home": {
+      "lead": "Sprite shows an animated character in your web app or game, through a renderer you install, so you never write your own rendering layer for an avatar.",
+      "example": {
+        "file": "home.ts",
+        "title": "Check a saved avatar",
+        "caption": "Builds the default mushroom avatar and validates it against Sprite's envelope schema. Pure data; no renderer or browser needed."
+      },
+      "ladder": {
+        "start": [
+          {
+            "title": "Quickstart",
+            "href": "/quickstart/",
+            "description": "Configure asset limits and present a character with the React component."
+          },
+          {
+            "title": "Core concepts",
+            "href": "/concepts/#core-concepts",
+            "description": "Character documents, players, render styles and asset policy."
+          }
+        ],
+        "tasks": [
+          {
+            "title": "Configure the host service",
+            "href": "/api/entry/",
+            "description": "createSprite, AssetPolicy and the built-in render styles."
+          },
+          {
+            "title": "Validate a saved avatar",
+            "href": "/api/avatar/",
+            "description": "Parse envelope data with createAvatarSchema or parseAvatar against a catalog."
+          },
+          {
+            "title": "Show a character with React",
+            "href": "/api/react/",
+            "description": "The Sprite component and SpriteProvider for a host div."
+          },
+          {
+            "title": "Play video clips",
+            "href": "/api/video/",
+            "description": "The optional browser-native MP4 renderer for a character."
+          }
+        ],
+        "reference": [
+          {
+            "title": "API reference",
+            "href": "/api/",
+            "description": "Every export from the root, ./react, ./video and ./avatar entrypoints."
+          },
+          {
+            "title": "Install",
+            "href": "/install/",
+            "description": "Entrypoints, the optional React peer, and what else installs."
+          },
+          {
+            "title": "Status and limits",
+            "href": "/status/",
+            "description": "Stability, asset-policy defaults and render-style limits."
+          }
+        ]
+      }
+    }
+  }
+}
