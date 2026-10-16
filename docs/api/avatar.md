@@ -434,7 +434,7 @@ lightness.
 function agentAppearance(seed): AgentAppearance;
 ```
 
-The pre-avatar mushroom identity colours for `seed`.
+The seeded mushroom identity colours for `seed`.
 
 #### Parameters
 
@@ -448,15 +448,15 @@ The pre-avatar mushroom identity colours for `seed`.
 
 ---
 
-### legacyAvatar()
+### seededAvatar()
 
 ```ts
-function legacyAvatar(seed): object;
+function seededAvatar(seed): object;
 ```
 
-The avatar a Sprite presents when none is stored: the mushroom, in the same
-seeded cap colour Agents have always worn, at rest, undecorated. Every reader
-falls back to this so an existing Agent's look never changes.
+The avatar an Agent wears until its owner chooses one: the mushroom, in the cap
+colour seeded from the Agent's id, at rest, undecorated. It is a pure function
+of identity, so hosts compute it instead of storing it.
 
 #### Parameters
 

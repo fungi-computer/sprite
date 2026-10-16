@@ -247,18 +247,18 @@ export type AgentAppearance = Readonly<{
   capSpot: string;
 }>;
 
-/** The pre-avatar mushroom identity colours for `seed`. */
+/** The seeded mushroom identity colours for `seed`. */
 export function agentAppearance(seed: string): AgentAppearance {
   const hue = seedHash(seed) % 360;
   return { cap: hexFromHsl(hue, 68, 72), capSpot: hexFromHsl(hue, 70, 92) };
 }
 
 /**
- * The avatar a Sprite presents when none is stored: the mushroom, in the same
- * seeded cap colour Agents have always worn, at rest, undecorated. Every
- * reader falls back to this so an existing Agent's look never changes.
+ * The avatar an Agent wears until its owner chooses one: the mushroom, in the
+ * cap colour seeded from the Agent's id, at rest, undecorated. It is a pure
+ * function of identity, so hosts compute it instead of storing it.
  */
-export function legacyAvatar(seed: string): Avatar {
+export function seededAvatar(seed: string): Avatar {
   return {
     v: 1,
     character: "mushroom",

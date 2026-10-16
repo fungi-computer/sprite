@@ -9,7 +9,7 @@ import {
   hexFromHsl,
   hslFromHex,
   hueDistance,
-  legacyAvatar,
+  seededAvatar,
   parseAvatar,
   shiftHue,
   type Avatar,
@@ -128,16 +128,16 @@ describe("createAvatarSchema (catalog-refined)", () => {
   });
 });
 
-describe("legacyAvatar", () => {
+describe("seededAvatar", () => {
   it("matches agentAppearance for 1,000 seeds", () => {
     for (let index = 0; index < 1000; index += 1) {
       const seed = `agent-${String(index)}`;
-      expect(legacyAvatar(seed).appearance).toEqual(agentAppearance(seed));
+      expect(seededAvatar(seed).appearance).toEqual(agentAppearance(seed));
     }
   });
 
   it("is the mushroom, at rest, plain", () => {
-    const avatar = legacyAvatar("agent-gardener");
+    const avatar = seededAvatar("agent-gardener");
     expect(avatar.character).toBe("mushroom");
     expect(avatar.expression).toBe("normal");
     expect(avatar.renderStyle).toBe("plain");
