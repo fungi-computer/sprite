@@ -13,7 +13,7 @@ export type {
   SpriteService,
 } from "./player.js";
 export { characterSchema } from "./document.js";
-export type { CharacterDocument, CharacterSource } from "./document.js";
+export type { CharacterDocument, CharacterSource, Json } from "./document.js";
 export { controlSchema, resolveAppearance } from "./controls.js";
 export type { Appearance, Control } from "./controls.js";
 export type { Asset, AssetPolicy } from "./assets.js";

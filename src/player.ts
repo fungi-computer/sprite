@@ -16,23 +16,36 @@ import {
   localCharacterSourceSchema,
   type CharacterDocument,
   type CharacterSource,
+  type Json,
 } from "./document.js";
 
 /** One complete request. Omitted customization resets to character defaults. */
 export type AvatarPresentation = {
+  /** Optional host clock in milliseconds; native animation seeks instead of running live. */
+  readonly timeMs?: number;
   readonly src: CharacterSource;
   readonly activity?: string;
   readonly expression?: string;
   readonly appearance?: Appearance;
   /** SVG filter drawn over the character; omitted draws it plain. */
   readonly renderStyle?: RenderStyle;
+  /**
+   * Renderer data for this presentation; Sprite never reads it. It is compared
+   * by identity, so keep the reference stable (for example with `useMemo`);
+   * a new object each render makes the renderer's `set` run every time.
+   */
+  readonly performance?: Json;
 };
 
 /** The resolved activity and appearance passed to a native renderer. */
 export type NativePresentation = {
+  /** Absolute animation time in milliseconds, when controlled by the host. */
+  readonly timeMs?: number;
   readonly activity: string;
   readonly expression: string | null;
   readonly appearance: Appearance;
+  /** The request's performance, unchanged and compared by identity. */
+  readonly performance?: Json;
 };
 
 /** The adapter registers native destruction in the selection scope. */
@@ -53,6 +66,8 @@ export type RendererContext = {
   readonly maxPixels: number;
   /** Report a native failure that occurs after the renderer has become ready. */
   readonly reportError: (error: Error) => void;
+  /** Publish renderer progress on the ready state; ignored once the selection closes. */
+  readonly reportProgress: (progress: Json) => void;
   /** Admit an asset and revoke its object URL when the selection closes. */
   readonly assetURL: (
     reference: string,
@@ -81,7 +96,11 @@ export type PlayerState =
       readonly document: CharacterDocument;
       readonly presentation: EffectivePresentation;
       readonly updateError?: Error;
+      /** The latest value the renderer passed to reportProgress. */
+      readonly progress?: Json;
     };
+
+type ReadyState = Extract<PlayerState, { readonly status: "ready" }>;
 
 /** An installed document and its renderer, loaded together by the shell. */
 export type LocalCharacter = {
@@ -129,6 +148,8 @@ type Selection = {
   native?: NativePlayer;
   document?: CharacterDocument;
   appliedKey?: string;
+  appliedPerformance?: Json | undefined;
+  progress?: Json;
 };
 
 type ResolvedSource =
@@ -289,7 +310,7 @@ export function createSprite(options: SpriteOptions): SpriteService {
           } else failSelection(updateError);
           return;
         }
-        const effective: EffectivePresentation = {
+        const resolved = {
           requestedActivity: activity,
           requestedExpression: expression,
           activity: native.activities.includes(activity) ? activity : "idle",
@@ -302,15 +323,23 @@ export function createSprite(options: SpriteOptions): SpriteService {
           fallback:
             !native.activities.includes(activity) ||
             (expression !== null && !native.expressions.includes(expression)),
-        };
+        } satisfies EffectivePresentation;
+        let effective: EffectivePresentation =
+          request.performance === undefined
+            ? resolved
+            : { ...resolved, performance: request.performance };
+        if (request.timeMs !== undefined)
+          effective = { ...effective, timeMs: request.timeMs };
         const key = JSON.stringify([
           effective.activity,
           effective.expression,
           effective.appearance,
+          effective.timeMs,
         ]);
         styles.set(renderStyle, current.holder);
         if (
           key === current.appliedKey &&
+          request.performance === current.appliedPerformance &&
           state.status === "ready" &&
           state.presentation.renderStyle === renderStyle &&
           state.updateError === undefined &&
@@ -319,11 +348,26 @@ export function createSprite(options: SpriteOptions): SpriteService {
         )
           return;
         try {
-          if (key !== current.appliedKey) native.set(effective);
+          if (
+            key !== current.appliedKey ||
+            request.performance !== current.appliedPerformance
+          )
+            native.set(effective);
           current.appliedKey = key;
+          current.appliedPerformance = request.performance;
           suspend();
-          if (selection === current)
-            publish({ status: "ready", document, presentation: effective });
+          if (selection === current) {
+            const ready: ReadyState = {
+              status: "ready",
+              document,
+              presentation: effective,
+            };
+            publish(
+              current.progress === undefined
+                ? ready
+                : { ...ready, progress: current.progress },
+            );
+          }
         } catch (error) {
           failSelection(asError(error));
         }
@@ -418,6 +462,11 @@ export function createSprite(options: SpriteOptions): SpriteService {
             reportError: (error) => {
               if (selection === current && !controller.signal.aborted)
                 failSelection(error);
+            },
+            reportProgress: (progress) => {
+              if (selection !== current || controller.signal.aborted) return;
+              current.progress = progress;
+              if (state.status === "ready") publish({ ...state, progress });
             },
             assetURL,
           });

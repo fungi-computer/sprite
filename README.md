@@ -77,6 +77,15 @@ replacing its host element. The React `Sprite` owns one player and disposes it
 when it unmounts. The imperative player exposes `set`, `pause`, `subscribe`, and
 asynchronous `dispose`.
 
+A presentation may carry `performance`, renderer data for that presentation such
+as a scene. Sprite passes it unchanged to the native renderer and compares it by
+**identity**: an equal value in a new object applies again. A host must keep the
+reference stable (for example with `useMemo`), or the renderer's `set` runs on
+every render. A renderer reports its own progress through `reportProgress` on
+its context. The ready state carries the latest value as `progress`, and the
+report is ignored once the selection closes. Sprite never reads either value.
+The selected adapter owns both schemas, as it owns `document.data`.
+
 `renderStyle` applies one of the built-in SVG filters: `plain`, `pencil`,
 `manga`, `riso`, `halftone`, `blueprint`, `crt`, or `watercolor`. Each player
 owns its filter instance. Animated styles pause when the player is paused, is
@@ -87,10 +96,18 @@ allowed origins, the maximum bytes per response, total bytes per selection, and
 request count. Local characters need no remote asset policy. Video uses the
 configured `video` renderer and reads clip assets through that same path.
 
-The React `Sprite` takes `src`, optional `activity`, `expression`, `appearance`
-and `renderStyle`, plus ordinary attributes for its host `div`. Pass `paused` to
-suspend it and `onState` to observe player states. A direct `service` prop
-overrides `SpriteProvider`; one of them is required.
+The React `Sprite` takes `src`, optional `activity`, `expression`, `appearance`,
+`renderStyle` and `performance`, plus ordinary attributes for its host `div`.
+Pass `paused` to suspend it and `onState` to observe player states. A direct
+`service` prop overrides `SpriteProvider`; one of them is required.
+
+For frame-driven playback, wrap an App in
+`<AnimationTimeProvider timeMs={frame / fps * 1000}>` from the same React entry.
+Every nested `Sprite` and Parakeet `AgentHead` inherits that clock, including
+memoized children. An explicit `timeMs` prop overrides it (zero included).
+Controlled players stay paused between seeks; omitting the provider time
+restores their ordinary live or paused behavior. No provider means no clock
+override.
 
 ### Saved avatars
 

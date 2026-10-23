@@ -134,6 +134,16 @@ A portable character, with renderer data still awaiting its native decoder.
 
 ---
 
+### Json
+
+```ts
+type Json = CharacterDocument["data"];
+```
+
+An opaque JSON value; the selected adapter owns its schema.
+
+---
+
 ### CharacterSource
 
 ```ts
@@ -157,6 +167,15 @@ type AvatarPresentation = object;
 One complete request. Omitted customization resets to character defaults.
 
 #### Properties
+
+##### timeMs?
+
+```ts
+readonly optional timeMs?: number;
+```
+
+Optional host clock in milliseconds; native animation seeks instead of running
+live.
 
 ##### src
 
@@ -190,6 +209,16 @@ readonly optional renderStyle?: RenderStyle;
 
 SVG filter drawn over the character; omitted draws it plain.
 
+##### performance?
+
+```ts
+readonly optional performance?: Json;
+```
+
+Renderer data for this presentation; Sprite never reads it. It is compared by
+identity, so keep the reference stable (for example with `useMemo`); a new
+object each render makes the renderer's `set` run every time.
+
 ---
 
 ### NativePresentation
@@ -201,6 +230,14 @@ type NativePresentation = object;
 The resolved activity and appearance passed to a native renderer.
 
 #### Properties
+
+##### timeMs?
+
+```ts
+readonly optional timeMs?: number;
+```
+
+Absolute animation time in milliseconds, when controlled by the host.
 
 ##### activity
 
@@ -219,6 +256,14 @@ readonly expression: string | null;
 ```ts
 readonly appearance: Appearance;
 ```
+
+##### performance?
+
+```ts
+readonly optional performance?: Json;
+```
+
+The request's performance, unchanged and compared by identity.
 
 ---
 
@@ -336,6 +381,24 @@ Report a native failure that occurs after the renderer has become ready.
 
 `void`
 
+##### reportProgress
+
+```ts
+readonly reportProgress: (progress) => void;
+```
+
+Publish renderer progress on the ready state; ignored once the selection closes.
+
+###### Parameters
+
+| Parameter  | Type            |
+| ---------- | --------------- |
+| `progress` | [`Json`](#json) |
+
+###### Returns
+
+`void`
+
 ##### assetURL
 
 ```ts
@@ -411,10 +474,54 @@ type PlayerState =
       document: CharacterDocument;
       presentation: EffectivePresentation;
       updateError?: Error;
+      progress?: Json;
     };
 ```
 
 Observable loading, ready, error, and disposal states.
+
+#### Union Members
+
+##### Type Literal
+
+```ts
+{
+  status: "empty" | "loading" | "destroyed";
+}
+```
+
+---
+
+##### Type Literal
+
+```ts
+{
+  status: "error";
+  error: Error;
+}
+```
+
+---
+
+##### Type Literal
+
+```ts
+{
+  status: "ready";
+  document: CharacterDocument;
+  presentation: EffectivePresentation;
+  updateError?: Error;
+  progress?: Json;
+}
+```
+
+| Name           | Type                                              | Description                                             |
+| -------------- | ------------------------------------------------- | ------------------------------------------------------- |
+| `status`       | `"ready"`                                         | -                                                       |
+| `document`     | [`CharacterDocument`](#characterdocument)         | -                                                       |
+| `presentation` | [`EffectivePresentation`](#effectivepresentation) | -                                                       |
+| `updateError?` | `Error`                                           | -                                                       |
+| `progress?`    | [`Json`](#json)                                   | The latest value the renderer passed to reportProgress. |
 
 ---
 

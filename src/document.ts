@@ -14,6 +14,9 @@ export const characterSchema = z.strictObject({
 /** A portable character, with renderer data still awaiting its native decoder. */
 export type CharacterDocument = z.infer<typeof characterSchema>;
 
+/** An opaque JSON value; the selected adapter owns its schema. */
+export type Json = CharacterDocument["data"];
+
 /** Domain key for a character installed by the host. */
 export const localCharacterSourceSchema = z.strictObject({
   local: z.string().trim().min(1),

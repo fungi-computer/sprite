@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { characterSchema } from "./document.js";
-import { createSprite } from "./player.js";
+import { createSprite, type NativePlayer, type PlayerState } from "./player.js";
 import { Sprite, SpriteProvider } from "./react.js";
 
 const document = characterSchema.parse({
@@ -100,6 +100,55 @@ describe("Sprite React host", () => {
     });
     await vi.waitFor(() => {
       expect(release).toHaveBeenCalled();
+    });
+    container.remove();
+  });
+
+  it("passes the performance prop to the renderer and delivers progress through onState", async () => {
+    const performance = { scene: "one" };
+    const set = vi.fn<NativePlayer["set"]>();
+    const service = createSprite({
+      characters: {
+        fixture: () =>
+          Promise.resolve({
+            document,
+            render: (context) => {
+              context.reportProgress({ beat: 1 });
+              return Effect.succeed({
+                activities: ["idle"],
+                expressions: ["normal"],
+                set,
+                pause: vi.fn(),
+              });
+            },
+          }),
+      },
+    });
+    const states: PlayerState[] = [];
+    const container = window.document.createElement("div");
+    window.document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sprite
+          service={service}
+          src={{ local: "fixture" }}
+          performance={performance}
+          onState={(state) => states.push(state)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(states.at(-1)).toMatchObject({
+        status: "ready",
+        progress: { beat: 1 },
+      });
+    });
+    expect(set.mock.calls[0]?.[0].performance).toBe(performance);
+    await act(async () => {
+      root.unmount();
+      await Promise.resolve();
     });
     container.remove();
   });

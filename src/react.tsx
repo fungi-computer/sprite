@@ -30,6 +30,29 @@ export function SpriteProvider({
   );
 }
 
+const AnimationTimeContext = createContext<number | undefined>(undefined);
+
+/** Optional external clock in milliseconds; omit timeMs to restore live playback. */
+export function AnimationTimeProvider({
+  timeMs,
+  children,
+}: {
+  readonly timeMs?: number;
+  readonly children: ReactNode;
+}) {
+  return (
+    <AnimationTimeContext.Provider value={timeMs}>
+      {children}
+    </AnimationTimeContext.Provider>
+  );
+}
+
+/** An explicit player time wins over the nearest external clock, including zero. */
+export function useAnimationTime(timeMs?: number): number | undefined {
+  const inherited = useContext(AnimationTimeContext);
+  return timeMs ?? inherited;
+}
+
 /** Avatar presentation plus ordinary attributes for the DOM host. */
 export type SpriteProps = AvatarPresentation &
   Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -49,12 +72,16 @@ export const Sprite = forwardRef<HTMLDivElement, SpriteProps>(function Sprite(
     expression,
     appearance,
     renderStyle,
+    performance,
+    timeMs: explicitTimeMs,
     paused = false,
     onState,
     ...props
   },
   forwardedRef,
 ) {
+  const timeMs = useAnimationTime(explicitTimeMs);
+  const externallyTimed = timeMs !== undefined;
   const configured = useContext(SpriteContext);
   const runtime = service ?? configured;
   if (!runtime)
@@ -94,10 +121,22 @@ export const Sprite = forwardRef<HTMLDivElement, SpriteProps>(function Sprite(
       presentation = { ...presentation, appearance };
     if (renderStyle !== undefined)
       presentation = { ...presentation, renderStyle };
+    if (performance !== undefined)
+      presentation = { ...presentation, performance };
+    if (timeMs !== undefined) presentation = { ...presentation, timeMs };
     mounted.set(presentation);
-  }, [runtime, src, activity, expression, appearance, renderStyle]);
+  }, [
+    runtime,
+    src,
+    activity,
+    expression,
+    appearance,
+    renderStyle,
+    performance,
+    timeMs,
+  ]);
   useEffect(() => {
-    player.current?.pause(paused);
-  }, [runtime, paused]);
+    player.current?.pause(paused || externallyTimed);
+  }, [runtime, paused, externallyTimed]);
   return <div {...props} ref={host} />;
 });

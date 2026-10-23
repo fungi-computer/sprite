@@ -2,7 +2,7 @@
 import * as Effect from "effect/Effect";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import { characterSchema } from "./document.js";
+import { characterSchema, type Json } from "./document.js";
 import { createSprite, type NativePlayer, type Renderer } from "./player.js";
 
 const document = characterSchema.parse({
@@ -357,3 +357,123 @@ it.each([
     }
   },
 );
+
+describe("performance in, progress out", () => {
+  const performance = { scene: [1, 2], cue: { beat: 0 } };
+  async function open(initial: { performance?: typeof performance } = {}) {
+    const value = native();
+    let report: ((progress: Json) => void) | undefined;
+    const player = createSprite({
+      assets,
+      renderers: {},
+      characters: {
+        fixture: () =>
+          Promise.resolve({
+            document,
+            render: (context) => {
+              report = context.reportProgress;
+              return Effect.succeed(value);
+            },
+          }),
+        other: () =>
+          Promise.resolve({ document, render: renderer(native(), vi.fn()) }),
+      },
+    }).mount(window.document.createElement("div"));
+    player.set({ src: { local: "fixture" }, ...initial });
+    await ready(player);
+    return { value, player, report: () => report };
+  }
+
+  it("passes performance to the native player unchanged and compares it by identity", async () => {
+    const { value, player } = await open({ performance });
+    expect(value.set).toHaveBeenCalledTimes(1);
+    expect(value.set.mock.calls[0]?.[0].performance).toBe(performance);
+    player.set({ src: { local: "fixture" }, performance });
+    expect(value.set).toHaveBeenCalledTimes(1);
+    const equal = { scene: [1, 2], cue: { beat: 0 } };
+    player.set({ src: { local: "fixture" }, performance: equal });
+    expect(value.set).toHaveBeenCalledTimes(2);
+    expect(value.set.mock.calls[1]?.[0].performance).toBe(equal);
+    await player.dispose();
+  });
+
+  it("publishes reported progress on the current ready state", async () => {
+    const { player, report } = await open();
+    const observer = vi.fn();
+    player.subscribe(observer);
+    report()?.({ beat: 2 });
+    expect(player.state).toMatchObject({
+      status: "ready",
+      progress: { beat: 2 },
+    });
+    expect(observer).toHaveBeenCalledTimes(1);
+    player.set({ src: { local: "fixture" }, activity: "speaking" });
+    expect(player.state).toMatchObject({ progress: { beat: 2 } });
+    await player.dispose();
+  });
+
+  it("drops progress reported by a closed selection after a source change", async () => {
+    const { player, report } = await open();
+    const stale = report();
+    expect(stale).toBeTypeOf("function");
+    player.set({ src: { local: "other" } });
+    await vi.waitFor(() => {
+      expect(player.state.status).toBe("ready");
+      expect(player.state).toHaveProperty("document");
+    });
+    const observer = vi.fn();
+    player.subscribe(observer);
+    stale?.({ beat: 7 });
+    expect(observer).not.toHaveBeenCalled();
+    expect(player.state).not.toHaveProperty("progress");
+    await player.dispose();
+  });
+
+  it("drops progress reported while a replacement is still closing the old selection", async () => {
+    const { player, report } = await open();
+    const stale = report();
+    const observer = vi.fn();
+    player.subscribe(observer);
+    player.set({ src: { local: "other" } });
+    expect(player.state.status).toBe("ready");
+    stale?.({ beat: 8 });
+    expect(observer).not.toHaveBeenCalled();
+    expect(player.state).not.toHaveProperty("progress");
+    await player.dispose();
+  });
+
+  it("delivers no progress to any listener or state after dispose", async () => {
+    const { player, report } = await open();
+    const publish = report();
+    expect(publish).toBeTypeOf("function");
+    await player.dispose();
+    const observer = vi.fn();
+    player.subscribe(observer);
+    publish?.({ beat: 9 });
+    expect(observer).not.toHaveBeenCalled();
+    expect(player.state).toEqual({ status: "destroyed" });
+  });
+});
+
+it("passes host time updates to the same native player, including backward seeks", async () => {
+  const value = native();
+  const load = vi.fn(() =>
+    Promise.resolve({ document, render: renderer(value, () => undefined) }),
+  );
+  const player = createSprite({ characters: { fixture: load } }).mount(
+    window.document.createElement("div"),
+  );
+  player.set({ src: { local: "fixture" }, activity: "speaking", timeMs: 500 });
+  await ready(player);
+  expect(value.set).toHaveBeenLastCalledWith(
+    expect.objectContaining({ timeMs: 500 }),
+  );
+  player.set({ src: { local: "fixture" }, activity: "speaking", timeMs: 100 });
+  expect(value.set).toHaveBeenLastCalledWith(
+    expect.objectContaining({ timeMs: 100 }),
+  );
+  player.set({ src: { local: "fixture" }, activity: "speaking" });
+  expect(value.set.mock.lastCall?.[0].timeMs).toBeUndefined();
+  expect(load).toHaveBeenCalledTimes(1);
+  await player.dispose();
+});

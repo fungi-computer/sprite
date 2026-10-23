@@ -1,6 +1,6 @@
 {
   "name": "@fungi.computer/sprite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Levi <levi@technomancy.dev>",
   "description": "Typed renderer-bounded presentation for Fungi agents",
   "type": "module",
@@ -56,7 +56,7 @@
     "@fungi.computer/cairn": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^18.2.0"
+    "react": "^18.2.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "react": {

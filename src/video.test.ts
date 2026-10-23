@@ -33,6 +33,7 @@ const open = (maxPixels = 2_000_000) => {
     signal: controller.signal,
     maxPixels,
     reportError,
+    reportProgress: vi.fn(),
     assetURL: (reference) => Effect.succeed(`blob:${reference}`),
   };
   const pending = Effect.runPromise(
