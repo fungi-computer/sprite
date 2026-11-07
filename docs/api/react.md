@@ -64,3 +64,45 @@ Shell-owned renderer and asset configuration; no selected identity lives here.
 #### Returns
 
 `Element`
+
+---
+
+### AnimationTimeProvider()
+
+```ts
+function AnimationTimeProvider(__namedParameters): Element;
+```
+
+Optional external clock in milliseconds; omit timeMs to restore live playback.
+
+#### Parameters
+
+| Parameter                    | Type                                                |
+| ---------------------------- | --------------------------------------------------- |
+| `__namedParameters`          | \{ `timeMs?`: `number`; `children`: `ReactNode`; \} |
+| `__namedParameters.timeMs?`  | `number`                                            |
+| `__namedParameters.children` | `ReactNode`                                         |
+
+#### Returns
+
+`Element`
+
+---
+
+### useAnimationTime()
+
+```ts
+function useAnimationTime(timeMs?): number | undefined;
+```
+
+An explicit player time wins over the nearest external clock, including zero.
+
+#### Parameters
+
+| Parameter | Type     |
+| --------- | -------- |
+| `timeMs?` | `number` |
+
+#### Returns
+
+`number` \| `undefined`
