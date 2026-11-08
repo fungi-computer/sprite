@@ -86,7 +86,7 @@ export type MyceliumOptions<Texture extends PixiTexture = PixiTexture> =
     palette: MyceliumPalette;
     /** Seed for a repeatable network. */
     seed?: number;
-    /** Segment budget before growth rests. Defaults to 2600. */
+    /** Segment budget before growth tapers off and rests. Defaults to 2600. */
     segments?: number;
     /** Thread opacity, 0 to 1. Defaults to 0.22 so text above stays readable. */
     threadAlpha?: number;
@@ -99,6 +99,12 @@ export type MyceliumOptions<Texture extends PixiTexture = PixiTexture> =
      * a headline's line boxes). Read again on every restart.
      */
     avoid?: () => readonly MyceliumRect[];
+    /**
+     * Distance, in CSS pixels, over which a thread thins to a point as it nears
+     * the host's edge or an avoided rectangle. Tips steer away when they can.
+     * Nodes stay at least this far inside. Defaults to 32.
+     */
+    margin?: number;
     /**
      * A focal rectangle, in host coordinates. Growth starts along its edges so
      * the network is densest around it. Defaults to the host's bottom and sides.
@@ -121,6 +127,11 @@ export type MyceliumField = Readonly<{
 }>;
 
 type Tip = { x: number; y: number; angle: number; life: number; width: number };
+/** Steps over which a tip thins to a point before its life runs out. */
+const TAPER_STEPS = 16;
+/** Turns, in radians, a tip tries in order when its way ahead is blocked. */
+const DEFLECTIONS = [0.35, 0.7, 1.05, 1.4];
+
 type Node = { x: number; y: number; glow: number; sprite: PixiGraphics };
 
 /** A small, fast, seeded PRNG (mulberry32). */
@@ -157,6 +168,7 @@ export async function mountMycelium<Texture extends PixiTexture>(
     pulseEvery = 2.4,
     threadWidth = 1.6,
     avoid = () => [],
+    margin = 32,
     focus = () => null,
   } = options;
   const view = host.ownerDocument.defaultView;
@@ -193,7 +205,36 @@ export async function mountMycelium<Texture extends PixiTexture>(
 
   let tips: Tip[] = [];
   let drawn = 0;
+  let resting = false;
+  let blocked: readonly MyceliumRect[] = [];
+  /** Distance from a point to the host's edge or the nearest avoided rectangle. */
+  const clearance = (x: number, y: number) => {
+    const { width, height } = app.screen;
+    let nearest = Math.min(x, y, width - x, height - y);
+    for (const rect of blocked) {
+      const dx = Math.max(rect.left - x, 0, x - rect.right);
+      const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+      nearest = Math.min(nearest, Math.hypot(dx, dy));
+    }
+    return nearest;
+  };
+  /**
+   * The heading a tip can keep for `margin` pixels, turning toward the side
+   * with more room, or null when it is boxed in.
+   */
+  const steer = (x: number, y: number, angle: number) => {
+    const room = (heading: number) =>
+      clearance(x + Math.cos(heading) * margin, y + Math.sin(heading) * margin);
+    for (const turn of DEFLECTIONS) {
+      const left = room(angle - turn);
+      const right = room(angle + turn);
+      if (Math.max(left, right) > 0)
+        return left > right ? angle - turn : angle + turn;
+    }
+    return null;
+  };
   const addNode = (x: number, y: number) => {
+    if (clearance(x, y) < margin) return;
     const dot = new pixi.Graphics()
       .circle(0, 0, 2.6 + rand() * 2)
       .fill({ color: palette.node });
@@ -202,16 +243,11 @@ export async function mountMycelium<Texture extends PixiTexture>(
     nodeLayer.addChild(dot);
     nodes.push({ x, y, glow: 0, sprite: dot });
   };
-  let blocked: readonly MyceliumRect[] = [];
-  const isBlocked = (x: number, y: number) =>
-    blocked.some(
-      (rect) =>
-        x > rect.left && x < rect.right && y > rect.top && y < rect.bottom,
-    );
   const seedTips = () => {
     const { width, height } = app.screen;
     blocked = avoid();
     tips = [];
+    resting = false;
     const start = (x: number, y: number, angle: number, life: number) => {
       tips.push({ x, y, angle, life, width: threadWidth });
       addNode(x, y);
@@ -263,25 +299,46 @@ export async function mountMycelium<Texture extends PixiTexture>(
     }
   };
   const grow = (steps: number) => {
-    const { width, height } = app.screen;
-    for (let step = 0; step < steps && drawn < segments; step += 1) {
+    for (let step = 0; step < steps && tips.length > 0; step += 1) {
+      // Near the budget, every tip thins out over its last steps instead of
+      // stopping mid-stroke.
+      if (!resting && drawn + tips.length * TAPER_STEPS >= segments) {
+        resting = true;
+        for (const tip of tips) tip.life = Math.min(tip.life, TAPER_STEPS);
+      }
       const next: Tip[] = [];
       for (const tip of tips) {
         const length = 3 + rand() * 4;
-        const angle = tip.angle + (rand() - 0.5) * 0.5;
+        const wander = tip.angle + (rand() - 0.5) * 0.5;
+        // A tip that meets an obstacle curls away from it and thins out
+        // rather than tracing the obstacle's straight edge.
+        const ahead = clearance(
+          tip.x + Math.cos(wander) * margin,
+          tip.y + Math.sin(wander) * margin,
+        );
+        if (ahead <= 0) tip.life = Math.min(tip.life, TAPER_STEPS);
+        const angle =
+          ahead > 0 ? wander : (steer(tip.x, tip.y, wander) ?? wander);
         const x = tip.x + Math.cos(angle) * length;
         const y = tip.y + Math.sin(angle) * length;
-        if (isBlocked(x, y)) continue;
-        pen.moveTo(tip.x, tip.y).lineTo(x, y).stroke({
-          width: tip.width,
-          color: palette.thread,
-          alpha: threadAlpha,
-          cap: "round",
-        });
-        drawn += 1;
+        const room = clearance(x, y);
+        if (room <= 0) continue;
         const life = tip.life - 1;
-        const inside = x > -20 && x < width + 20 && y > -20 && y < height + 20;
-        if (!inside || life <= 0) continue;
+        const taper = Math.max(
+          0,
+          Math.min(1, room / margin, life / TAPER_STEPS),
+        );
+        pen
+          .moveTo(tip.x, tip.y)
+          .lineTo(x, y)
+          .stroke({
+            width: tip.width * taper,
+            color: palette.thread,
+            alpha: threadAlpha * Math.sqrt(taper),
+            cap: "round",
+          });
+        drawn += 1;
+        if (life <= 0) continue;
         next.push({
           x,
           y,
@@ -289,7 +346,7 @@ export async function mountMycelium<Texture extends PixiTexture>(
           life,
           width: Math.max(0.5, tip.width * 0.998),
         });
-        if (rand() < 0.035 && next.length < 90) {
+        if (!resting && rand() < 0.035 && next.length < 90) {
           const branch = angle + (rand() < 0.5 ? -1 : 1) * (0.5 + rand() * 0.6);
           next.push({
             x,
@@ -302,7 +359,6 @@ export async function mountMycelium<Texture extends PixiTexture>(
         }
       }
       tips = next;
-      if (tips.length === 0) break;
     }
     app.renderer.render({ container: pen, target: baked, clear: false });
     pen.clear();
@@ -334,7 +390,7 @@ export async function mountMycelium<Texture extends PixiTexture>(
   let untilPulse = pulseEvery;
   const tick = () => {
     const seconds = app.ticker.deltaMS / 1000;
-    if (drawn < segments && tips.length > 0) grow(4);
+    if (tips.length > 0) grow(4);
     untilPulse -= seconds;
     if (untilPulse <= 0) {
       pulse();

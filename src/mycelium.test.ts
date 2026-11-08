@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountMycelium, type PixiModule } from "./mycelium.js";
 
 type Recorded = { segments: number; renders: number; started: number };
+type Stroke = { x: number; y: number; width: number };
 
-function fakePixi(recorded: Recorded): PixiModule {
+function fakePixi(recorded: Recorded, strokes: Stroke[] = []): PixiModule {
+  let end = { x: 0, y: 0 };
   class Graphics {
     alpha = 1;
     position = { set: () => undefined };
@@ -13,11 +15,13 @@ function fakePixi(recorded: Recorded): PixiModule {
     moveTo() {
       return this;
     }
-    lineTo() {
+    lineTo(x: number, y: number) {
       recorded.segments += 1;
+      end = { x, y };
       return this;
     }
-    stroke() {
+    stroke(style: { width: number }) {
+      strokes.push({ ...end, width: style.width });
       return this;
     }
     circle() {
@@ -119,6 +123,41 @@ describe("mountMycelium", () => {
     expect(recorded.started).toBe(0);
     field.destroy();
     expect(host.querySelector("canvas")).toBeNull();
+  });
+
+  it("thins threads to points instead of cutting them at an edge", async () => {
+    stubBrowser(true);
+    const recorded: Recorded = { segments: 0, renders: 0, started: 0 };
+    const strokes: Stroke[] = [];
+    const avoided = { left: 500, top: 0, right: 700, bottom: 600 };
+    (
+      await mountMycelium(document.createElement("div"), {
+        pixi: fakePixi(recorded, strokes),
+        palette: { thread: "#4c4f69", node: "#f98284" },
+        segments: 3000,
+        margin: 30,
+        avoid: () => [avoided],
+      })
+    ).destroy();
+    const near = strokes.filter(
+      ({ x, y }) =>
+        Math.min(
+          x,
+          y,
+          1200 - x,
+          600 - y,
+          Math.abs(x - 500),
+          Math.abs(x - 700),
+        ) < 3,
+    );
+    expect(strokes.length).toBeGreaterThan(0);
+    for (const { x, y, width } of strokes) {
+      expect(x > avoided.left && x < avoided.right).toBe(false);
+      expect(x >= 0 && x <= 1200 && y >= 0 && y <= 600).toBe(true);
+      expect(width).toBeGreaterThanOrEqual(0);
+      expect(width).toBeLessThanOrEqual(1.6);
+    }
+    for (const { width } of near) expect(width).toBeLessThan(0.2);
   });
 
   it("repeats the same network for the same seed", async () => {

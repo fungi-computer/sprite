@@ -1,5 +1,14 @@
 # @fungi.computer/sprite
 
+## 0.2.1
+
+### Patch Changes
+
+- Changes since 0.2.0:
+
+  - fix(sprite): never stroke a mycelium thread with negative width
+  - fix(fungi-landing): taper mycelium threads instead of cutting them
+
 ## 0.2.0
 
 ### Minor Changes
