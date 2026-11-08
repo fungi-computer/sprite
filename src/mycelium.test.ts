@@ -125,7 +125,7 @@ describe("mountMycelium", () => {
     expect(host.querySelector("canvas")).toBeNull();
   });
 
-  it("thins threads to points instead of cutting them at an edge", async () => {
+  it("thins threads to points at obstacles and runs them off the edge", async () => {
     stubBrowser(true);
     const recorded: Recorded = { segments: 0, renders: 0, started: 0 };
     const strokes: Stroke[] = [];
@@ -140,24 +140,21 @@ describe("mountMycelium", () => {
       })
     ).destroy();
     const near = strokes.filter(
-      ({ x, y }) =>
-        Math.min(
-          x,
-          y,
-          1200 - x,
-          600 - y,
-          Math.abs(x - 500),
-          Math.abs(x - 700),
-        ) < 3,
+      ({ x }) => Math.min(Math.abs(x - 500), Math.abs(x - 700)) < 10,
     );
-    expect(strokes.length).toBeGreaterThan(0);
+    expect(near.length).toBeGreaterThan(0);
+    // Within a third of the margin, a 1.6px thread is at most a third as wide.
+    for (const { width } of near) expect(width).toBeLessThan(0.54);
     for (const { x, y, width } of strokes) {
       expect(x > avoided.left && x < avoided.right).toBe(false);
-      expect(x >= 0 && x <= 1200 && y >= 0 && y <= 600).toBe(true);
+      expect(x >= -30 && x <= 1230 && y >= -30 && y <= 630).toBe(true);
       expect(width).toBeGreaterThanOrEqual(0);
       expect(width).toBeLessThanOrEqual(1.6);
     }
-    for (const { width } of near) expect(width).toBeLessThan(0.2);
+    // Threads reach the host's edge instead of stopping short of it.
+    expect(
+      strokes.some(({ x, y }) => x < 0 || x > 1200 || y < 0 || y > 600),
+    ).toBe(true);
   });
 
   it("repeats the same network for the same seed", async () => {

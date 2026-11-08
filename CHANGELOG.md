@@ -1,5 +1,13 @@
 # @fungi.computer/sprite
 
+## 0.2.2
+
+### Patch Changes
+
+- Changes since 0.2.1:
+
+  - fix(fungi-landing): grow the mycelium edge to edge
+
 ## 0.2.1
 
 ### Patch Changes

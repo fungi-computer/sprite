@@ -101,10 +101,13 @@ export type MyceliumOptions<Texture extends PixiTexture = PixiTexture> =
     avoid?: () => readonly MyceliumRect[];
     /**
      * Distance, in CSS pixels, over which a thread thins to a point as it nears
-     * the host's edge or an avoided rectangle. Tips steer away when they can.
-     * Nodes stay at least this far inside. Defaults to 32.
+     * an avoided rectangle; tips steer away when they can. Threads run on past
+     * the host's edge, so the host fades its own boundary. Nodes stay at least
+     * this far from both. Defaults to 32.
      */
     margin?: number;
+    /** How far each thread grows, as a multiple of its natural life. Defaults to 1. */
+    reach?: number;
     /**
      * A focal rectangle, in host coordinates. Growth starts along its edges so
      * the network is densest around it. Defaults to the host's bottom and sides.
@@ -169,6 +172,7 @@ export async function mountMycelium<Texture extends PixiTexture>(
     threadWidth = 1.6,
     avoid = () => [],
     margin = 32,
+    reach = 1,
     focus = () => null,
   } = options;
   const view = host.ownerDocument.defaultView;
@@ -206,11 +210,15 @@ export async function mountMycelium<Texture extends PixiTexture>(
   let tips: Tip[] = [];
   let drawn = 0;
   let resting = false;
+  /** Starts one new tip; set by seedTips for the current layout. */
+  let spawn: () => void = () => undefined;
+  /** Tips the field keeps alive, and new tips it may still start. */
+  let crowd = 0;
+  let spares = 0;
   let blocked: readonly MyceliumRect[] = [];
-  /** Distance from a point to the host's edge or the nearest avoided rectangle. */
+  /** Distance from a point to the nearest avoided rectangle. */
   const clearance = (x: number, y: number) => {
-    const { width, height } = app.screen;
-    let nearest = Math.min(x, y, width - x, height - y);
+    let nearest = Number.POSITIVE_INFINITY;
     for (const rect of blocked) {
       const dx = Math.max(rect.left - x, 0, x - rect.right);
       const dy = Math.max(rect.top - y, 0, y - rect.bottom);
@@ -233,8 +241,13 @@ export async function mountMycelium<Texture extends PixiTexture>(
     }
     return null;
   };
+  /** Distance from a point inward to the host's edge; negative outside. */
+  const inside = (x: number, y: number) => {
+    const { width, height } = app.screen;
+    return Math.min(x, y, width - x, height - y);
+  };
   const addNode = (x: number, y: number) => {
-    if (clearance(x, y) < margin) return;
+    if (Math.min(clearance(x, y), inside(x, y)) < margin) return;
     const dot = new pixi.Graphics()
       .circle(0, 0, 2.6 + rand() * 2)
       .fill({ color: palette.node });
@@ -249,19 +262,36 @@ export async function mountMycelium<Texture extends PixiTexture>(
     tips = [];
     resting = false;
     const start = (x: number, y: number, angle: number, life: number) => {
-      tips.push({ x, y, angle, life, width: threadWidth });
+      // A thread needs room to grow before it can thin out gracefully.
+      if (clearance(x, y) < margin * 2) return;
+      tips.push({ x, y, angle, life: life * reach, width: threadWidth });
       addNode(x, y);
     };
     const target = focus();
     if (target) {
       // Densest around the focus: threads leave its edges and wrap around it.
       // Growth lives in the gutters and below the focus: threads leave its
-      // left and right edges and its bottom, never its top.
-      const count = Math.max(10, Math.round(width / 90));
-      for (let index = 0; index < count; index += 1) {
+      // left and right edges and fan out from its bottom, never its top.
+      // A few more come in from the host's sides, so the field spans it.
+      crowd = Math.max(10, Math.round(width / 90));
+      spawn = () => {
         const side = rand();
         const along = rand();
-        if (side < 0.4)
+        if (side < 0.15)
+          start(
+            0,
+            height * (0.2 + along * 0.8),
+            (rand() - 0.5) * 1.2,
+            110 + rand() * 180,
+          );
+        else if (side < 0.3)
+          start(
+            width,
+            height * (0.2 + along * 0.8),
+            Math.PI + (rand() - 0.5) * 1.2,
+            110 + rand() * 180,
+          );
+        else if (side < 0.55)
           start(
             target.left - 6,
             target.top + along * (target.bottom - target.top),
@@ -279,24 +309,26 @@ export async function mountMycelium<Texture extends PixiTexture>(
           start(
             target.left + along * (target.right - target.left),
             target.bottom + 6,
-            Math.PI / 2 + (rand() - 0.5) * 1.2,
+            Math.PI / 2 + (rand() - 0.5) * 2.2,
             60 + rand() * 110,
           );
-      }
-      return;
+      };
+    } else {
+      crowd = Math.max(6, Math.round(width / 160));
+      spawn = () => {
+        const fromBottom = rand() < 0.6;
+        const x = fromBottom ? rand() * width : rand() < 0.5 ? 0 : width;
+        const y = fromBottom ? height : height * (0.35 + rand() * 0.65);
+        const angle = fromBottom
+          ? -Math.PI / 2 + (rand() - 0.5) * 1.1
+          : x === 0
+            ? -0.4 + (rand() - 0.5) * 0.8
+            : Math.PI + 0.4 + (rand() - 0.5) * 0.8;
+        start(x, y, angle, 120 + rand() * 220);
+      };
     }
-    const count = Math.max(4, Math.round(width / 220));
-    for (let index = 0; index < count; index += 1) {
-      const fromBottom = rand() < 0.6;
-      const x = fromBottom ? rand() * width : rand() < 0.5 ? 0 : width;
-      const y = fromBottom ? height : height * (0.35 + rand() * 0.65);
-      const angle = fromBottom
-        ? -Math.PI / 2 + (rand() - 0.5) * 1.1
-        : x === 0
-          ? -0.4 + (rand() - 0.5) * 0.8
-          : Math.PI + 0.4 + (rand() - 0.5) * 0.8;
-      start(x, y, angle, 120 + rand() * 220);
-    }
+    spares = crowd * 3;
+    for (let index = 0; index < crowd; index += 1) spawn();
   };
   const grow = (steps: number) => {
     for (let step = 0; step < steps && tips.length > 0; step += 1) {
@@ -305,6 +337,12 @@ export async function mountMycelium<Texture extends PixiTexture>(
       if (!resting && drawn + tips.length * TAPER_STEPS >= segments) {
         resting = true;
         for (const tip of tips) tip.life = Math.min(tip.life, TAPER_STEPS);
+      }
+      // Threads that end early hand their budget to fresh ones, so the field
+      // fills out the same however the first threads fared.
+      while (!resting && spares > 0 && tips.length < crowd / 2) {
+        spares -= 1;
+        spawn();
       }
       const next: Tip[] = [];
       for (const tip of tips) {
@@ -316,13 +354,14 @@ export async function mountMycelium<Texture extends PixiTexture>(
           tip.x + Math.cos(wander) * margin,
           tip.y + Math.sin(wander) * margin,
         );
-        if (ahead <= 0) tip.life = Math.min(tip.life, TAPER_STEPS);
+        if (ahead <= 0) tip.life = Math.min(tip.life, 3 + rand() * 9);
         const angle =
           ahead > 0 ? wander : (steer(tip.x, tip.y, wander) ?? wander);
         const x = tip.x + Math.cos(angle) * length;
         const y = tip.y + Math.sin(angle) * length;
         const room = clearance(x, y);
-        if (room <= 0) continue;
+        // Past the host's edge the thread is off screen; let it go.
+        if (room <= 0 || inside(x, y) < -margin) continue;
         const life = tip.life - 1;
         const taper = Math.max(
           0,
