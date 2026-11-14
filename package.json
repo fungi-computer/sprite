@@ -36,24 +36,16 @@
   ],
   "scripts": {
     "clean": "node --input-type=module --eval \"import { rm } from 'node:fs/promises'; await rm('dist', { recursive: true, force: true });\"",
-    "lint": "eslint src test vitest.config.ts --max-warnings=0 && ../../node_modules/.bin/oxlint --config ../../oxlint.config.ts --deny-warnings src test vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "pnpm run clean && tsc -p tsconfig.build.json",
-    "test": "vitest run --config vitest.config.ts",
-    "docs": "tsx ../../tooling/repository/src/docs/cli.ts check --root ../..",
-    "docs:write": "tsx ../../tooling/repository/src/docs/cli.ts write --root ../..",
-    "pack": "mkdir -p ../../.botanical/sprite-pack && pnpm pack --pack-destination ../../.botanical/sprite-pack",
     "smoke": "node --input-type=module -e \"import('./dist/index.js').then(({ createSprite }) => { if (typeof createSprite !== 'function') process.exit(1); })\"",
-    "stranger": "tsx ../../tooling/repository/src/artifacts/cli.ts --repo-root ../.. .",
     "workbench:contract": "node scripts/workbench-contract.mjs",
-    "workbench:build": "ladle build",
-    "format:check": "node ../../tooling/repository/scripts/format-package-check.mjs",
-    "lint:anti-slop": "node ../../tooling/repository/scripts/lint-package-anti-slop.mjs"
+    "workbench:build": "ladle build"
   },
   "dependencies": {
     "effect": "4.0.2",
     "zod": "4.4.3",
-    "@fungi.computer/cairn": "workspace:*"
+    "@fungi.computer/cairn": "0.1.0"
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0"
