@@ -1,28 +1,17 @@
 # Sprite (`@fungi.computer/sprite`)
 
-Sprite presents a character document through a host-installed renderer, so a
-game or app can show an animated avatar without writing its own rendering layer.
-The host chooses local characters, renderer adapters, network origins, and asset
-limits. Each mounted player owns its current source and presentation lifetime.
+Sprite shows an animated character in your app or game. Your host installs the
+drawing engine, so you do not write rendering code.
 
-## Install or set up
+![The Sprite built-in catalog: pick a character, then change its expression, activity and size](docs/media/readme-sprite.png)
+
+## Quick start
+
+Install it:
 
 ```sh
 npm install @fungi.computer/sprite
 ```
-
-The package ships ESM only and depends on Effect, Zod, and
-[Cairn](../cairn/README.md) at runtime. React is an optional peer dependency,
-needed only for the `./react` entrypoint. The core entrypoint,
-`@fungi.computer/sprite`, exports the renderer-neutral player API.
-`@fungi.computer/sprite/react` exports the React provider and component.
-`@fungi.computer/sprite/video` exports the optional video renderer. `./avatar`
-supplies avatar descriptors and catalog-aware validation. `./ink` and
-`./mycelium` mount decorative drawings independently of the character player.
-Zdog support ships as the separate [Sprite Zdog](../sprite-zdog/README.md)
-package.
-
-## Quick start
 
 This illustrative React example configures the host's asset policy and lazy
 video renderer, then presents a character document:
@@ -62,6 +51,52 @@ The package tests exercise player updates, React lifetime, and asset admission.
 See [`src/player.test.ts`](src/player.test.ts),
 [`src/react.test.tsx`](src/react.test.tsx), and
 [`src/assets.test.ts`](src/assets.test.ts).
+
+## Common tasks
+
+### Show a character
+
+Create a Sprite service, then render `<Sprite>` with a source. See the Quick
+start.
+
+### Save an avatar
+
+See [Saved avatars](#saved-avatars).
+
+### Draw a decorative picture
+
+See [Decorative drawings](#decorative-drawings).
+
+### Limit what assets it may load
+
+Set `allowedOrigins` and the byte limits when you create the service. See the
+Quick start.
+
+## Reference
+
+### Overview
+
+Sprite presents a character document through a host-installed renderer, so a
+game or app can show an animated avatar without writing its own rendering layer.
+The host chooses local characters, renderer adapters, network origins, and asset
+limits. Each mounted player owns its current source and presentation lifetime.
+
+## Install or set up
+
+```sh
+npm install @fungi.computer/sprite
+```
+
+The package ships ESM only and depends on Effect, Zod, and
+[Cairn](../cairn/README.md) at runtime. React is an optional peer dependency,
+needed only for the `./react` entrypoint. The core entrypoint,
+`@fungi.computer/sprite`, exports the renderer-neutral player API.
+`@fungi.computer/sprite/react` exports the React provider and component.
+`@fungi.computer/sprite/video` exports the optional video renderer. `./avatar`
+supplies avatar descriptors and catalog-aware validation. `./ink` and
+`./mycelium` mount decorative drawings independently of the character player.
+Zdog support ships as the separate [Sprite Zdog](../sprite-zdog/README.md)
+package.
 
 ## Core concepts
 
