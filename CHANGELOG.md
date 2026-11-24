@@ -1,5 +1,12 @@
 # @fungi.computer/sprite
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @fungi.computer/cairn@0.1.1
+
 ## 0.2.2
 
 ### Patch Changes
